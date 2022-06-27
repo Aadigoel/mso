@@ -2,6 +2,8 @@
 Module with scoring functions that take RDKit mol objects as input for scoring.
 """
 import warnings
+import sys
+sys.path.append("C:\Workspaces\iiith\mso\mso")
 from mso.data import data_dir
 import os
 import pandas as pd
@@ -11,6 +13,7 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors, AllChem
 from rdkit.Chem.Descriptors import qed, MolLogP
 from rdkit import DataStructs
+import networkx as nx
 
 
 smarts = pd.read_csv(os.path.join(data_dir, "sure_chembl_alerts.txt"), header=None, sep='\t')[1].tolist()
@@ -114,6 +117,7 @@ def heavy_atom_count(mol):
     Number of heavy atoms in molecule
     """
     hac = Chem.Descriptors.HeavyAtomCount(mol)
+    #hmw = Chem.Descriptors.HeavyAtomMolWt(mol)
     return hac
 
 
@@ -123,6 +127,11 @@ def molecular_weight(mol):
     mw = Chem.Descriptors.MolWt(mol)
     return mw
 
+@check_valid_mol
+def heavy_molecular_weight(mol):
+    """heavy molecule weight"""
+    hmw = Chem.Descriptors.HeavyAtomMolWt(mol)
+    return hmw
 
 @check_valid_mol
 def penalize_long_aliphatic_chains(mol, min_members):
@@ -146,6 +155,11 @@ def penalize_macrocycles(mol):
             score = 0
             break
     return score
+
+@check_valid_mol
+def solubility(mol):
+    """To maximize the solubility of the molecule"""
+    pass
 
 @check_valid_mol
 def tox_alert(mol):
@@ -220,3 +234,8 @@ def has_chembl_substruct(mol):
         return 0
     else:
         return 1
+
+@check_valid_mol
+def meta_stability(mol):
+    """To maximize the metabolic stability of the molecule"""
+    pass
