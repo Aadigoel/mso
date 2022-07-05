@@ -1,6 +1,9 @@
 """"
 Module defining the main Particle Swarm optimizer class.
 """
+import sys
+sys.path.append("C:\Workspaces\iiith\mso\mso")
+
 import time
 import numpy as np
 import logging
@@ -39,7 +42,7 @@ class BasePSOptimizer:
         this particle.
         :param swarm: The swarm that is updated.
         :return: The swarm that is updated.
-        """
+        """ 
         assert self.scoring_functions is not None
         weight_sum = 0
         fitness = 0
@@ -120,8 +123,9 @@ class BasePSOptimizer:
         for step in range(num_steps):
             self._update_best_fitness_history(step)
             max_fitness, min_fitness, mean_fitness = self._update_best_solutions(num_track)
-            print("Step %d, max: %.3f, min: %.3f, mean: %.3f"
+            print("Step %d, max: %.3f, min: %.3f, mean: %.3f, please just print something"
                   % (step, max_fitness, min_fitness, mean_fitness))
+            #print(self.best_fitness_history.iloc[-1])
             for swarm in self.swarms:
                 self._next_step_and_evaluate(swarm)
         return self.swarms

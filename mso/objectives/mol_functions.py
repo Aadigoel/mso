@@ -55,6 +55,8 @@ def tan_sim(mol, ref_smiles):
     :param ref_smiles: reference molecule as SMILES.
     :return: The Tanimoto similarity
     """
+
+
     ref_mol = Chem.MolFromSmiles(ref_smiles)
     fp_query = AllChem.GetMorganFingerprint(mol, 2)
     fp_ref = AllChem.GetMorganFingerprint(ref_mol, 2)
