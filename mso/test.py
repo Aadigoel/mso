@@ -8,7 +8,7 @@ from IPython.display import display
 from mso.objectives.mol_functions import tox_alert
 from mso.optimizer import BasePSOptimizer
 from mso.objectives.scoring import ScoringFunction
-from mso.objectives.mol_functions import qed_score, substructure_match_score, penalize_macrocycles, heavy_atom_count, tan_sim#, heavy_molecular_weight
+from mso.objectives.mol_functions import qed_score, substructure_match_score, penalize_macrocycles, sa_score
 import mso.objectives.mol_functions as molf
 from cddd.inference import InferenceModel
 from rdkit import Chem
@@ -107,11 +107,11 @@ def run(num_steps, num_track=10):
         return opt.swarms
 
 infer_model = InferenceModel("C:\Workspaces\iiith\cddd\default_model") # The CDDD inference model used to encode/decode molecular SMILES strings to/from the CDDD space. You might need to specify the path to the pretrained model (e.g. default_model)
-init_smiles = "c1ccccc1" # SMILES representation of benzene
+init_smiles = "O" # SMILES representation of benzene
 hac_desirability = [{"x": 0, "y": 0}, {"x": 5, "y": 0.1}, {"x": 15, "y": 0.9}, {"x": 20, "y": 1.0}, {"x": 25, "y": 1.0}, {"x": 30, "y": 0.9,}, {"x": 40, "y": 0.1}, {"x": 45, "y": 0.0}]
 substructure_match_score = partial(substructure_match_score, query=Chem.MolFromSmiles("c1ccccc1")) # use partial to define the additional argument (the substructure) 
 miss_match_desirability = [{"x": 0, "y": 1}, {"x": 1, "y": 0}]
-properties = st.multiselect("Choose the properties to Optmize", ["heavy_molecular_weight","qed_score","substructure_match_score","logp_score","tox_alert","penalize_macrocycles"])
+properties = st.multiselect("Choose the properties to Optmize", ["heavy_molecular_weight","qed_score","substructure_match_score","logp_score","tox_alert","penalize_macrocycles","SAS"])
 num_steps = int(st.number_input("Numer of Iterations: ",min_value=10, max_value=30))
 submit = st.button("Submit")
 if submit:
@@ -120,17 +120,19 @@ if submit:
     print(properties)
     for i in properties:
         if i == "qed_score":
-            scoring_functions.append(ScoringFunction(qed_score, "qed", is_mol_func=True))
+            scoring_functions.append(ScoringFunction(qed_score, "qed", weight= 500, is_mol_func=True))
         if i == "heavy_molecular_weight":
             scoring_functions.append(ScoringFunction(heavy_molecular_weight, "hmw", desirability=hac_desirability, is_mol_func=True))
         if i == "substructure_match_score":
             scoring_functions.append(ScoringFunction(substructure_match_score, "miss_match",desirability=miss_match_desirability, is_mol_func=True))
         if i == "logp_score":
-            scoring_functions.append(ScoringFunction(logp_score, "partition", is_mol_func=True))
+            scoring_functions.append(ScoringFunction(logp_score, "partition", weight=-100, is_mol_func=True))
         if i == "tox_alert":
             scoring_functions.append(ScoringFunction(tox_alert, "mol_sol", is_mol_func=True))
         if i == "penalize_macrocycles":
             scoring_functions.append(ScoringFunction(penalize_macrocycles, "pen_macro", is_mol_func=True))
+        if i == "SAS":
+            scoring_functions.append(ScoringFunction(sa_score, "sa_score", is_mol_func= True))
 
 
        
@@ -145,7 +147,7 @@ if submit:
 # ]
     opt = BasePSOptimizer.from_query(
         init_smiles=init_smiles,
-        num_part=10,
+        num_part=100,
         num_swarms=1,
         inference_model=infer_model,
         scoring_functions=scoring_functions)
@@ -157,9 +159,15 @@ if submit:
     st.text("Top Hits:")
     for i in range(10):
         smile_st = str(opt.best_solutions.iloc[i]["smiles"])
+        mol_st = Chem.MolFromSmiles(smile_st)
         caption = round(float(opt.best_solutions.iloc[i]["fitness"])*100,2)
-        smile_mol = Chem.MolFromSmiles(smile_st)
-        smile_image = Draw.MolToImage(smile_mol)
-        st.image(smile_image,caption="Reward: "+str(caption))
+        hmw = heavy_molecular_weight(mol_st)
+        qed = round(float(Chem.Descriptors.qed(mol_st)), 2)
+        tox = tox_alert(mol_st)
+        miss_match = substructure_match_score(mol_st)
+        partition = round(float(logp_score(mol_st)),2)
+        pen_macro = penalize_macrocycles(mol_st)
+        smile_image = Draw.MolToImage(mol_st)
+        st.image(smile_image,caption="Reward: "+str(caption)+"\nQED: "+str(qed)+" LogP:"+str(partition))
         
 # display(opt.best_solutions)

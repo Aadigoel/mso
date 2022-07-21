@@ -34,6 +34,7 @@ class BasePSOptimizer:
         self.swarms = swarms
         self.best_solutions = pd.DataFrame(columns=["smiles", "fitness"])
         self.best_fitness_history = pd.DataFrame(columns=["step", "swarm", "fitness"])
+        self.indi_fitness = pd.DataFrame(columns=["hmw","qed","miss_match","partition","mol_sol","pen_macro"])
 
     def update_fitness(self, swarm):
         """
@@ -83,6 +84,7 @@ class BasePSOptimizer:
         :return: The max, min and mean fitness of the best_solutions dataframe.
         """
         new_df = pd.DataFrame(columns=["smiles", "fitness"])
+
         new_df.smiles = [sml for swarm in self.swarms for sml in swarm.smiles]
         new_df.fitness = [fit for swarm in self.swarms for fit in swarm.fitness]
         new_df.smiles = new_df.smiles.map(canonicalize_smiles)
