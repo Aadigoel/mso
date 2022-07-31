@@ -10,9 +10,11 @@ import pandas as pd
 import numpy as np
 from functools import wraps
 from rdkit import Chem
-from rdkit.Chem import Descriptors, AllChem
+from rdkit.Chem import Descriptors, AllChem, RDConfig
 from rdkit.Chem.Descriptors import qed, MolLogP
 from rdkit import DataStructs
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
 import networkx as nx
 
 
@@ -84,25 +86,6 @@ def substructure_match_score(mol, query, kind="any"):
         score = 1
     else:
         score = 0
-    return score
-
-@check_valid_mol
-def sa_score(mol):
-    """
-    Synthetic acceptability score as proposed by Ertel et al..
-    """
-    try:
-        score = sascorer.calculateScore(mol)
-    except:
-        score = 0
-    return score
-
-@check_valid_mol
-def logp_score(mol):
-    """
-    crippen logP
-    """
-    score = Chem.Crippen.MolLogP(mol)
     return score
 
 @check_valid_mol
@@ -236,8 +219,3 @@ def has_chembl_substruct(mol):
         return 0
     else:
         return 1
-
-@check_valid_mol
-def meta_stability(mol):
-    """To maximize the metabolic stability of the molecule"""
-    pass

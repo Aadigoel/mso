@@ -1,5 +1,7 @@
 #from mso.mso.objectives.mol_functions import solubility
 import sys
+from io import StringIO
+import json
 sys.path.append("C:\Workspaces\iiith\mso\mso")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,8 +10,7 @@ from IPython.display import display
 from mso.objectives.mol_functions import tox_alert
 from mso.optimizer import BasePSOptimizer
 from mso.objectives.scoring import ScoringFunction
-from mso.objectives.mol_functions import qed_score, substructure_match_score, penalize_macrocycles, sa_score
-import mso.objectives.mol_functions as molf
+from mso.objectives.mol_functions import qed_score, substructure_match_score, penalize_macrocycles
 from cddd.inference import InferenceModel
 from rdkit import Chem
 from functools import partial
@@ -21,11 +22,17 @@ import numpy as np
 from functools import wraps
 from rdkit import Chem
 from rdkit.Chem import Draw
-from rdkit.Chem import Descriptors, AllChem
+from rdkit.Chem import RDConfig
 from rdkit.Chem.Descriptors import qed, MolLogP
 from rdkit import DataStructs
 import networkx as nx
+sys.path.append(os.path.join(RDConfig.RDContribDir, 'SA_Score'))
+import sascorer
+
+
 import streamlit as st
+
+
 st.set_page_config(page_title='D4: MolOpt')
 st.title('Molecule Optimization Dashboard')
 smarts = pd.read_csv(os.path.join(data_dir, "sure_chembl_alerts.txt"), header=None, sep='\t')[1].tolist()
@@ -51,6 +58,24 @@ def heavy_molecular_weight(mol):
     """heavy molecule weight"""
     hmw = Chem.Descriptors.HeavyAtomMolWt(mol)
     return hmw
+
+def sa_score(mol):
+    """
+    Synthetic acceptability score as proposed by Ertel et al..
+    """
+    try:
+        score = sascorer.calculateScore(mol)
+    except:
+        score = 0
+    return score
+
+@check_valid_mol
+def logp_score(mol):
+    """
+    crippen logP
+    """
+    score = Chem.Crippen.MolLogP(mol)
+    return score
 
 @check_valid_mol
 def neg_simil(mol):
@@ -111,43 +136,39 @@ init_smiles = "O" # SMILES representation of benzene
 hac_desirability = [{"x": 0, "y": 0}, {"x": 5, "y": 0.1}, {"x": 15, "y": 0.9}, {"x": 20, "y": 1.0}, {"x": 25, "y": 1.0}, {"x": 30, "y": 0.9,}, {"x": 40, "y": 0.1}, {"x": 45, "y": 0.0}]
 substructure_match_score = partial(substructure_match_score, query=Chem.MolFromSmiles("c1ccccc1")) # use partial to define the additional argument (the substructure) 
 miss_match_desirability = [{"x": 0, "y": 1}, {"x": 1, "y": 0}]
-properties = st.multiselect("Choose the properties to Optmize", ["heavy_molecular_weight","qed_score","substructure_match_score","logp_score","tox_alert","penalize_macrocycles","SAS"])
+file_json = st.file_uploader("Upload a JSON file", type=([".json"]))
 num_steps = int(st.number_input("Numer of Iterations: ",min_value=10, max_value=30))
+if file_json:
+    stringio = StringIO(file_json.getvalue().decode("utf-8"))
+    string_data = stringio.read()
+    dict_data = json.loads(string_data)
+    st.write(dict_data)
+
 submit = st.button("Submit")
+
 if submit:
     scoring_functions = []
-    #scoring_functions.append(ScoringFunction(tan_sim, "tan_sim", is_mol_func=True, weight=-1))
-    print(properties)
-    for i in properties:
-        if i == "qed_score":
-            scoring_functions.append(ScoringFunction(qed_score, "qed", weight= 500, is_mol_func=True))
-        if i == "heavy_molecular_weight":
+#     #scoring_functions.append(ScoringFunction(tan_sim, "tan_sim", is_mol_func=True, weight=-1))
+#     print(properties)
+    for i in dict_data["parameters"]:
+        if i["name"]== "qed_score":
+            scoring_functions.append(ScoringFunction(qed_score, "qed", weight= i["weight"], is_mol_func=True))
+        if i["name"]== "heavy_molecular_weight":
             scoring_functions.append(ScoringFunction(heavy_molecular_weight, "hmw", desirability=hac_desirability, is_mol_func=True))
-        if i == "substructure_match_score":
+        if i["name"]== "substructure_match_score":
             scoring_functions.append(ScoringFunction(substructure_match_score, "miss_match",desirability=miss_match_desirability, is_mol_func=True))
-        if i == "logp_score":
+        if i["name"]== "logp_score":
             scoring_functions.append(ScoringFunction(logp_score, "partition", weight=-100, is_mol_func=True))
-        if i == "tox_alert":
+        if i["name"]== "tox_alert":
             scoring_functions.append(ScoringFunction(tox_alert, "mol_sol", is_mol_func=True))
-        if i == "penalize_macrocycles":
+        if i["name"]== "penalize_macrocycles":
             scoring_functions.append(ScoringFunction(penalize_macrocycles, "pen_macro", is_mol_func=True))
-        if i == "SAS":
-            scoring_functions.append(ScoringFunction(sa_score, "sa_score", is_mol_func= True))
+        if i["name"]== "sa_score":
+            scoring_functions.append(ScoringFunction(sa_score, "sa_score", weight=i["weight"], is_mol_func= True))
 
-
-       
-# scoring_functions = [
-#     ScoringFunction(heavy_molecular_weight, "hmw", desirability=hac_desirability, is_mol_func=True),
-#     #ScoringFunction(heavy_atom_count, "hac", desirability=hac_desirability, is_mol_func=True),
-#     ScoringFunction(qed_score, "qed", is_mol_func=True),
-#     ScoringFunction(substructure_match_score, "miss_match",desirability=miss_match_desirability, is_mol_func=True),
-#     ScoringFunction(logp_score, "partition", is_mol_func=True),
-#     ScoringFunction(tox_alert, "mol_sol", is_mol_func=True),
-#     ScoringFunction(penalize_macrocycles, "pen_macro", is_mol_func=True)
-# ]
     opt = BasePSOptimizer.from_query(
         init_smiles=init_smiles,
-        num_part=100,
+        num_part=10,
         num_swarms=1,
         inference_model=infer_model,
         scoring_functions=scoring_functions)
@@ -156,6 +177,7 @@ if submit:
 
     st.balloons()
     print(opt.best_solutions)
+    df = pd.DataFrame(columns = ["SMILES", "QED", "SAS", "LogP", "Tox_alert"])
     st.text("Top Hits:")
     for i in range(10):
         smile_st = str(opt.best_solutions.iloc[i]["smiles"])
@@ -164,10 +186,14 @@ if submit:
         hmw = heavy_molecular_weight(mol_st)
         qed = round(float(Chem.Descriptors.qed(mol_st)), 2)
         tox = tox_alert(mol_st)
+        sas = sa_score(mol_st)
         miss_match = substructure_match_score(mol_st)
         partition = round(float(logp_score(mol_st)),2)
         pen_macro = penalize_macrocycles(mol_st)
         smile_image = Draw.MolToImage(mol_st)
+        df.loc[i] = [smile_st, qed, sas, partition, tox]
         st.image(smile_image,caption="Reward: "+str(caption)+"\nQED: "+str(qed)+" LogP:"+str(partition))
-        
-# display(opt.best_solutions)
+    
+    #print(df)
+       
+#display(opt.best_solutions)
