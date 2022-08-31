@@ -54,7 +54,7 @@ def check_valid_mol(func):
     return wrapper
 
 @check_valid_mol
-def heavy_molecular_weight(mol):
+def heavy_molecular_weight(mol): 
     """heavy molecule weight"""
     hmw = Chem.Descriptors.HeavyAtomMolWt(mol)
     return hmw
@@ -132,7 +132,7 @@ def run(num_steps, num_track=10):
         return opt.swarms
 
 infer_model = InferenceModel("C:\Workspaces\iiith\cddd\default_model") # The CDDD inference model used to encode/decode molecular SMILES strings to/from the CDDD space. You might need to specify the path to the pretrained model (e.g. default_model)
-init_smiles = "O" # SMILES representation of benzene
+init_smiles = "c1ccccc1" # SMILES representation of benzene
 hac_desirability = [{"x": 0, "y": 0}, {"x": 5, "y": 0.1}, {"x": 15, "y": 0.9}, {"x": 20, "y": 1.0}, {"x": 25, "y": 1.0}, {"x": 30, "y": 0.9,}, {"x": 40, "y": 0.1}, {"x": 45, "y": 0.0}]
 substructure_match_score = partial(substructure_match_score, query=Chem.MolFromSmiles("c1ccccc1")) # use partial to define the additional argument (the substructure) 
 miss_match_desirability = [{"x": 0, "y": 1}, {"x": 1, "y": 0}]
@@ -144,12 +144,22 @@ if file_json:
     dict_data = json.loads(string_data)
     st.write(dict_data)
 
+func_name = st.text_input("Enter name of function")
+
+custom = st.text_area("Enter text")
+
 submit = st.button("Submit")
 
 if submit:
+    # custom = lambda x: None
+    # lambda_list = []
+    # if custom_func:
+    #     for func in custom_funcs:
+    #         lambda_list.append(eval(func))
+    #     #custom = eval(custom_func)
     scoring_functions = []
-#     #scoring_functions.append(ScoringFunction(tan_sim, "tan_sim", is_mol_func=True, weight=-1))
-#     print(properties)
+    custom_eval = exec(custom)
+
     for i in dict_data["parameters"]:
         if i["name"]== "qed_score":
             scoring_functions.append(ScoringFunction(qed_score, "qed", weight= i["weight"], is_mol_func=True))
@@ -158,13 +168,15 @@ if submit:
         if i["name"]== "substructure_match_score":
             scoring_functions.append(ScoringFunction(substructure_match_score, "miss_match",desirability=miss_match_desirability, is_mol_func=True))
         if i["name"]== "logp_score":
-            scoring_functions.append(ScoringFunction(logp_score, "partition", weight=-100, is_mol_func=True))
+            scoring_functions.append(ScoringFunction(logp_score, "partition", weight=i["weight"], is_mol_func=True))
         if i["name"]== "tox_alert":
             scoring_functions.append(ScoringFunction(tox_alert, "mol_sol", is_mol_func=True))
         if i["name"]== "penalize_macrocycles":
             scoring_functions.append(ScoringFunction(penalize_macrocycles, "pen_macro", is_mol_func=True))
         if i["name"]== "sa_score":
             scoring_functions.append(ScoringFunction(sa_score, "sa_score", weight=i["weight"], is_mol_func= True))
+        if i["name"] == "custom":
+            scoring_functions.append(ScoringFunction(eval(func_name), "Custom", weight = i["weight"], is_mol_func = True))
 
     opt = BasePSOptimizer.from_query(
         init_smiles=init_smiles,
@@ -194,6 +206,6 @@ if submit:
         df.loc[i] = [smile_st, qed, sas, partition, tox]
         st.image(smile_image,caption="Reward: "+str(caption)+"\nQED: "+str(qed)+" LogP:"+str(partition))
     
-    #print(df)
+    print(df)
        
 #display(opt.best_solutions)
